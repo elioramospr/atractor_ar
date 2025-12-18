@@ -2,8 +2,11 @@ let camera, scene, renderer;
 let cube;
 let container, arButton, statusText;
 
+console.log('Script iniciado');
+
 // Esperar a que la página y Three.js carguen completamente
-window.addEventListener('load', () => {
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM cargado');
     container = document.getElementById('container');
     arButton = document.getElementById('arButton');
     statusText = document.getElementById('status');
@@ -11,10 +14,13 @@ window.addEventListener('load', () => {
     // Verificar que Three.js esté cargado
     if (typeof THREE === 'undefined') {
         statusText.textContent = 'Error: Three.js no se ha cargado';
+        console.error('THREE no definido');
         return;
     }
     
+    console.log('Inicializando...');
     init();
+    checkARSupport();
     animate();
 });
 
@@ -56,26 +62,29 @@ function init() {
     renderer.xr.enabled = true;
     container.appendChild(renderer.domElement);
 
-    // Verificar soporte de WebXR con timeout
-    checkARSupport();
-
     // Manejar redimensionamiento
     window.addEventListener('resize', onWindowResize);
+    
+    console.log('Init completado');
 }
 
 async function checkARSupport() {
     try {
+        console.log('Verificando soporte AR...');
+        
         if (!('xr' in navigator)) {
+            console.log('WebXR no disponible');
             statusText.textContent = 'WebXR no disponible. Safari iOS requiere versión 13+';
             arButton.disabled = false;
             arButton.textContent = 'Probar AR de todas formas';
-            arButton.addEventListener('click', onARButtonClick);
             return;
         }
 
+        console.log('WebXR disponible, comprobando soporte...');
+        
         // Timeout para iOS que a veces tarda en responder
         const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Timeout')), 3000)
+            setTimeout(() => reject(new Error('Timeout')), 5000)
         );
 
         const supported = await Promise.race([
@@ -83,28 +92,35 @@ async function checkARSupport() {
             timeoutPromise
         ]);
 
+        console.log('AR soportado:', supported);
+
         if (supported) {
             arButton.disabled = false;
             arButton.textContent = 'Iniciar AR';
             statusText.textContent = 'AR disponible - Pulsa el botón';
-            arButton.addEventListener('click', onARButtonClick);
         } else {
-            statusText.textContent = 'AR no soportado';
+            statusText.textContent = 'AR no soportado en este dispositivo';
             arButton.textContent = 'Probar de todas formas';
             arButton.disabled = false;
-            arButton.addEventListener('click', onARButtonClick);
         }
     } catch (err) {
         console.error('Error verificando AR:', err);
-        statusText.textContent = 'No se pudo verificar AR. Intenta presionar el botón';
+        statusText.textContent = 'Error al verificar AR: ' + err.message;
         arButton.disabled = false;
         arButton.textContent = 'Iniciar AR';
-        arButton.addEventListener('click', onARButtonClick);
     }
+    
+    // Asegurar que el botón tenga el listener
+    arButton.removeEventListener('click', onARButtonClick);
+    arButton.addEventListener('click', onARButtonClick);
 }
 
 async function onARButtonClick() {
     try {
+        console.log('Intentando iniciar AR...');
+        arButton.disabled = true;
+        statusText.textContent = 'Iniciando AR...';
+        
         // Configuración de la sesión AR
         const sessionInit = {
             requiredFeatures: ['hit-test'],
@@ -113,9 +129,13 @@ async function onARButtonClick() {
         };
 
         const session = await navigator.xr.requestSession('immersive-ar', sessionInit);
+        console.log('Sesión AR iniciada');
+        
         renderer.xr.setSession(session);
 
         session.addEventListener('end', () => {
+            console.log('Sesión AR finalizada');
+            arButton.disabled = false;
             arButton.textContent = 'Iniciar AR';
             statusText.textContent = 'Sesión AR finalizada';
         });
@@ -124,8 +144,10 @@ async function onARButtonClick() {
         statusText.textContent = 'Sesión AR activa';
 
     } catch (err) {
-        statusText.textContent = 'Error al iniciar AR: ' + err.message;
         console.error('Error AR:', err);
+        statusText.textContent = 'Error: ' + err.message;
+        arButton.disabled = false;
+        arButton.textContent = 'Iniciar AR';
     }
 }
 
