@@ -1,11 +1,22 @@
 let camera, scene, renderer;
 let cube;
-const container = document.getElementById('container');
-const arButton = document.getElementById('arButton');
-const statusText = document.getElementById('status');
+let container, arButton, statusText;
 
-init();
-animate();
+// Esperar a que la página y Three.js carguen completamente
+window.addEventListener('load', () => {
+    container = document.getElementById('container');
+    arButton = document.getElementById('arButton');
+    statusText = document.getElementById('status');
+    
+    // Verificar que Three.js esté cargado
+    if (typeof THREE === 'undefined') {
+        statusText.textContent = 'Error: Three.js no se ha cargado';
+        return;
+    }
+    
+    init();
+    animate();
+});
 
 function init() {
     // Crear escena
@@ -45,27 +56,51 @@ function init() {
     renderer.xr.enabled = true;
     container.appendChild(renderer.domElement);
 
-    // Verificar soporte de WebXR
-    if ('xr' in navigator) {
-        navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
-            if (supported) {
-                arButton.disabled = false;
-                arButton.textContent = 'Iniciar AR';
-                statusText.textContent = 'AR disponible - Pulsa el botón para comenzar';
-                
-                arButton.addEventListener('click', onARButtonClick);
-            } else {
-                statusText.textContent = 'AR no soportado en este dispositivo';
-            }
-        }).catch((err) => {
-            statusText.textContent = 'Error al verificar soporte AR: ' + err.message;
-        });
-    } else {
-        statusText.textContent = 'WebXR no disponible en este navegador';
-    }
+    // Verificar soporte de WebXR con timeout
+    checkARSupport();
 
     // Manejar redimensionamiento
     window.addEventListener('resize', onWindowResize);
+}
+
+async function checkARSupport() {
+    try {
+        if (!('xr' in navigator)) {
+            statusText.textContent = 'WebXR no disponible. Safari iOS requiere versión 13+';
+            arButton.disabled = false;
+            arButton.textContent = 'Probar AR de todas formas';
+            arButton.addEventListener('click', onARButtonClick);
+            return;
+        }
+
+        // Timeout para iOS que a veces tarda en responder
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout')), 3000)
+        );
+
+        const supported = await Promise.race([
+            navigator.xr.isSessionSupported('immersive-ar'),
+            timeoutPromise
+        ]);
+
+        if (supported) {
+            arButton.disabled = false;
+            arButton.textContent = 'Iniciar AR';
+            statusText.textContent = 'AR disponible - Pulsa el botón';
+            arButton.addEventListener('click', onARButtonClick);
+        } else {
+            statusText.textContent = 'AR no soportado';
+            arButton.textContent = 'Probar de todas formas';
+            arButton.disabled = false;
+            arButton.addEventListener('click', onARButtonClick);
+        }
+    } catch (err) {
+        console.error('Error verificando AR:', err);
+        statusText.textContent = 'No se pudo verificar AR. Intenta presionar el botón';
+        arButton.disabled = false;
+        arButton.textContent = 'Iniciar AR';
+        arButton.addEventListener('click', onARButtonClick);
+    }
 }
 
 async function onARButtonClick() {
