@@ -1,22 +1,18 @@
+// Importar Three.js como ES Module
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
 let camera, scene, renderer;
 let cube;
 let container, arButton, statusText;
 
 console.log('Script iniciado');
 
-// Esperar a que la página y Three.js carguen completamente
+// Esperar a que la página cargue completamente
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM cargado');
     container = document.getElementById('container');
     arButton = document.getElementById('arButton');
     statusText = document.getElementById('status');
-    
-    // Verificar que Three.js esté cargado
-    if (typeof THREE === 'undefined') {
-        statusText.textContent = 'Error: Three.js no se ha cargado';
-        console.error('THREE no definido');
-        return;
-    }
     
     console.log('Inicializando...');
     init();
