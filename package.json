@@ -1,18 +1,24 @@
 {
   "name": "atractor_ar",
   "version": "1.0.0",
-  "description": "Ejemplo de realidad aumentada con Three.js",
+  "description": "Ejemplo de realidad aumentada con Three.js y WebXR",
+  "type": "module",
   "main": "main.js",
   "scripts": {
-    "dev": "npx http-server -p 8000 -c-1",
-    "start": "npm run dev"
+    "dev": "npx http-server -p 8000 -c-1 --cors",
+    "start": "npm run dev",
+    "preview": "npm run dev"
   },
   "keywords": [
     "threejs",
     "ar",
     "webxr",
-    "augmented-reality"
+    "augmented-reality",
+    "webgl"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
 }
