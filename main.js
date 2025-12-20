@@ -1,166 +1,125 @@
-// Importar Three.js como ES Module
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+var scene, camera, renderer, clock, deltaTime, totalTime;
 
-let camera, scene, renderer;
-let cube;
-let container, arButton, statusText;
+var arToolkitSource, arToolkitContext;
 
-console.log('Script iniciado');
+var markerRoot1, markerRoot2;
 
-// Esperar a que la página cargue completamente
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOM cargado');
-    container = document.getElementById('container');
-    arButton = document.getElementById('arButton');
-    statusText = document.getElementById('status');
-    
-    console.log('Inicializando...');
-    init();
-    checkARSupport();
-    animate();
-});
+var mesh1;
 
-function init() {
-    // Crear escena
-    scene = new THREE.Scene();
+initialize();
+animate();
 
-    // Configurar cámara
-    camera = new THREE.PerspectiveCamera(
-        70,
-        window.innerWidth / window.innerHeight,
-        0.01,
-        20
-    );
+function initialize()
+{
+	scene = new THREE.Scene();
 
-    // Crear luz
-    const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-    light.position.set(0.5, 1, 0.25);
-    scene.add(light);
+	let ambientLight = new THREE.AmbientLight( 0xcccccc, 0.5 );
+	scene.add( ambientLight );
+				
+	camera = new THREE.Camera();
+	scene.add(camera);
 
-    // Crear cubo
-    const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
-    const material = new THREE.MeshStandardMaterial({
-        color: 0x00ff00,
-        roughness: 0.7,
-        metalness: 0.3
-    });
-    cube = new THREE.Mesh(geometry, material);
-    cube.position.set(0, 0, -0.5);
-    scene.add(cube);
+	renderer = new THREE.WebGLRenderer({
+		antialias : true,
+		alpha: true
+	});
+	renderer.setClearColor(new THREE.Color('lightgrey'), 0)
+	renderer.setSize( 640, 480 );
+	renderer.domElement.style.position = 'absolute'
+	renderer.domElement.style.top = '0px'
+	renderer.domElement.style.left = '0px'
+	document.body.appendChild( renderer.domElement );
 
-    // Configurar renderer
-    renderer = new THREE.WebGLRenderer({ 
-        antialias: true, 
-        alpha: true 
-    });
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.xr.enabled = true;
-    container.appendChild(renderer.domElement);
+	clock = new THREE.Clock();
+	deltaTime = 0;
+	totalTime = 0;
+	
+	////////////////////////////////////////////////////////////
+	// setup arToolkitSource
+	////////////////////////////////////////////////////////////
 
-    // Manejar redimensionamiento
-    window.addEventListener('resize', onWindowResize);
-    
-    console.log('Init completado');
+	arToolkitSource = new THREEx.ArToolkitSource({
+		sourceType : 'webcam',
+	});
+
+	function onResize()
+	{
+		arToolkitSource.onResize()	
+		arToolkitSource.copySizeTo(renderer.domElement)	
+		if ( arToolkitContext.arController !== null )
+		{
+			arToolkitSource.copySizeTo(arToolkitContext.arController.canvas)	
+		}	
+	}
+
+	arToolkitSource.init(function onReady(){
+		onResize()
+	});
+	
+	// handle resize event
+	window.addEventListener('resize', function(){
+		onResize()
+	});
+	
+	////////////////////////////////////////////////////////////
+	// setup arToolkitContext
+	////////////////////////////////////////////////////////////	
+
+	// create atToolkitContext
+	arToolkitContext = new THREEx.ArToolkitContext({
+		cameraParametersUrl: 'data/camera_para.dat',
+		detectionMode: 'mono'
+	});
+	
+	// copy projection matrix to camera when initialization complete
+	arToolkitContext.init( function onCompleted(){
+		camera.projectionMatrix.copy( arToolkitContext.getProjectionMatrix() );
+	});
+
+	////////////////////////////////////////////////////////////
+	// setup markerRoots
+	////////////////////////////////////////////////////////////
+
+	// build markerControls
+	markerRoot1 = new THREE.Group();
+	scene.add(markerRoot1);
+	let markerControls1 = new THREEx.ArMarkerControls(arToolkitContext, markerRoot1, {
+		type: 'pattern', patternUrl: "data/hiro.patt",
+	})
+
+	let geometry1	= new THREE.CubeGeometry(1,1,1);
+	let material1	= new THREE.MeshNormalMaterial({
+		transparent: true,
+		opacity: 0.5,
+		side: THREE.DoubleSide
+	}); 
+	
+	mesh1 = new THREE.Mesh( geometry1, material1 );
+	mesh1.position.y = 0.5;
+	
+	markerRoot1.add( mesh1 );
 }
 
-async function checkARSupport() {
-    try {
-        console.log('Verificando soporte AR...');
-        
-        if (!('xr' in navigator)) {
-            console.log('WebXR no disponible');
-            statusText.textContent = 'WebXR no disponible. Safari iOS requiere versión 13+';
-            arButton.disabled = false;
-            arButton.textContent = 'Probar AR de todas formas';
-            return;
-        }
 
-        console.log('WebXR disponible, comprobando soporte...');
-        
-        // Timeout para iOS que a veces tarda en responder
-        const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Timeout')), 5000)
-        );
-
-        const supported = await Promise.race([
-            navigator.xr.isSessionSupported('immersive-ar'),
-            timeoutPromise
-        ]);
-
-        console.log('AR soportado:', supported);
-
-        if (supported) {
-            arButton.disabled = false;
-            arButton.textContent = 'Iniciar AR';
-            statusText.textContent = 'AR disponible - Pulsa el botón';
-        } else {
-            statusText.textContent = 'AR no soportado en este dispositivo';
-            arButton.textContent = 'Probar de todas formas';
-            arButton.disabled = false;
-        }
-    } catch (err) {
-        console.error('Error verificando AR:', err);
-        statusText.textContent = 'Error al verificar AR: ' + err.message;
-        arButton.disabled = false;
-        arButton.textContent = 'Iniciar AR';
-    }
-    
-    // Asegurar que el botón tenga el listener
-    arButton.removeEventListener('click', onARButtonClick);
-    arButton.addEventListener('click', onARButtonClick);
+function update()
+{
+	// update artoolkit on every frame
+	if ( arToolkitSource.ready !== false )
+		arToolkitContext.update( arToolkitSource.domElement );
 }
 
-async function onARButtonClick() {
-    try {
-        console.log('Intentando iniciar AR...');
-        arButton.disabled = true;
-        statusText.textContent = 'Iniciando AR...';
-        
-        // Configuración de la sesión AR
-        const sessionInit = {
-            requiredFeatures: ['hit-test'],
-            optionalFeatures: ['dom-overlay'],
-            domOverlay: { root: document.body }
-        };
 
-        const session = await navigator.xr.requestSession('immersive-ar', sessionInit);
-        console.log('Sesión AR iniciada');
-        
-        renderer.xr.setSession(session);
-
-        session.addEventListener('end', () => {
-            console.log('Sesión AR finalizada');
-            arButton.disabled = false;
-            arButton.textContent = 'Iniciar AR';
-            statusText.textContent = 'Sesión AR finalizada';
-        });
-
-        arButton.textContent = 'Detener AR';
-        statusText.textContent = 'Sesión AR activa';
-
-    } catch (err) {
-        console.error('Error AR:', err);
-        statusText.textContent = 'Error: ' + err.message;
-        arButton.disabled = false;
-        arButton.textContent = 'Iniciar AR';
-    }
+function render()
+{
+	renderer.render( scene, camera );
 }
 
-function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-}
 
-function animate() {
-    renderer.setAnimationLoop(render);
-}
-
-function render() {
-    // Rotar el cubo para que sea más visible
-    cube.rotation.x += 0.01;
-    cube.rotation.y += 0.01;
-
-    renderer.render(scene, camera);
+function animate()
+{
+	requestAnimationFrame(animate);
+	deltaTime = clock.getDelta();
+	totalTime += deltaTime;
+	update();
+	render();
 }
